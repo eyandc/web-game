@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%8E%AE%3C/text%3E%3C/svg%3E">
+<meta name="theme-color" content="#0f1220">
+<title>Tic-Tac-Toe — Arcade Hub</title>
+<link rel="stylesheet" href="../css/style.css">
+<style>
+  .ttt-board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    grid-template-rows: repeat(3, 1fr);
+    gap: 8px;
+    width: min(90vw, 340px);
+    height: min(90vw, 340px);
+    background: #0b0e1c;
+    padding: 8px;
+    border-radius: 10px;
+  }
+  .ttt-cell {
+    background: rgba(255,255,255,0.06);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(1.8rem, 8vw, 3rem);
+    font-weight: 800;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  .ttt-cell:hover { background: rgba(255,255,255,0.12); }
+  .ttt-cell.x { color: #22d3ee; }
+  .ttt-cell.o { color: #f472b6; }
+  .ttt-cell.win { background: rgba(74, 222, 128, 0.25); }
+  .mode-row {
+    display: flex; justify-content: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap;
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="brand"><span class="dot"></span> Arcade Hub</div>
+  <a class="home-link" href="../index.html">← All games</a>
+</header>
+
+<div class="game-wrap">
+  <h1>❌ Tic-Tac-Toe</h1>
+  <p class="hint">Tap a square to play</p>
+
+  <div class="mode-row">
+    <button class="btn secondary" id="modeAI">Vs Computer</button>
+    <button class="btn secondary" id="mode2P">2 Players</button>
+  </div>
+
+  <div class="hud">
+    <div class="pill">Wins <span id="wins">0</span></div>
+    <div class="pill">Losses <span id="losses">0</span></div>
+    <div class="pill">Draws <span id="draws">0</span></div>
+  </div>
+
+  <div class="stage">
+    <div class="ttt-board" id="board"></div>
+  </div>
+
+  <div class="overlay-msg" id="msg"></div>
+  <div style="margin-top:14px;">
+    <button class="btn" id="restartBtn">Restart Round</button>
+  </div>
+</div>
+
+<script>
+const boardEl = document.getElementById('board');
+const msgEl = document.getElementById('msg');
+const restartBtn = document.getElementById('restartBtn');
+const modeAIBtn = document.getElementById('modeAI');
+const mode2PBtn = document.getElementById('mode2P');
+const winsEl = document.getElementById('wins');
+const lossesEl = document.getElementById('losses');
+const drawsEl = document.getElementById('draws');
+
+let vsAI = true;
+let cells, turn, gameActive;
+let stats = JSON.parse(localStorage.getItem('ttt-stats') || '{"wins":0,"losses":0,"draws":0}');
+updateStats();
+
+const LINES = [
+  [0,1,2],[3,4,5],[6,7,8],
+  [0,3,6],[1,4,7],[2,5,8],
+  [0,4,8],[2,4,6]
+];
+
+function updateStats() {
+  winsEl.textContent = stats.wins;
+  lossesEl.textContent = stats.losses;
+  drawsEl.textContent = stats.draws;
+  localStorage.setItem('ttt-stats', JSON.stringify(stats));
+}
+
+function reset() {
+  cells = Array(9).fill('');
+  turn = 'X';
+  gameActive = true;
+  msgEl.textContent = vsAI ? 'Your turn (X)' : 'Player X\'s turn';
+  msgEl.className = 'overlay-msg';
+  render();
+}
+
+function render() {
+  boardEl.innerHTML = '';
+  cells.forEach((v, i) => {
+    const d = document.createElement('div');
+    d.className = 'ttt-cell' + (v === 'X' ? ' x' : v === 'O' ? ' o' : '');
+    d.textContent = v;
+    d.addEventListener('click', () => handleMove(i));
+    boardEl.appendChild(d);
+  });
+}
+
+function handleMove(i) {
+  if (!gameActive || cells[i]) return;
+  if (vsAI && turn === 'O') return;
+  cells[i] = turn;
+  render();
+  const result = checkResult();
+  if (result) return endGame(result);
+  turn = turn === 'X' ? 'O' : 'X';
+  msgEl.textContent = vsAI ? 'Computer thinking…' : `Player ${turn}'s turn`;
+
+  if (vsAI && turn === 'O' && gameActive) {
+    setTimeout(() => {
+      const move = bestMove();
+      if (move != null) {
+        cells[move] = 'O';
+        render();
+        const r2 = checkResult();
+        if (r2) return endGame(r2);
+        turn = 'X';
+        msgEl.textContent = 'Your turn (X)';
+      }
+    }, 350);
+  }
+}
+
+function checkResult() {
+  for (const line of LINES) {
+    const [a,b,c] = line;
+    if (cells[a] && cells[a] === cells[b] && cells[a] === cells[c]) {
+      return { winner: cells[a], line };
+    }
+  }
+  if (cells.every(c => c)) return { winner: null, line: null };
+  return null;
+}
+
+function endGame(result) {
+  gameActive = false;
+  if (result.line) {
+    result.line.forEach(i => boardEl.children[i].classList.add('win'));
+  }
+  if (result.winner === null) {
+    msgEl.textContent = "It's a draw!";
+    msgEl.className = 'overlay-msg';
+    stats.draws++;
+  } else if (vsAI) {
+    if (result.winner === 'X') { msgEl.textContent = 'You win! 🎉'; msgEl.className = 'overlay-msg good'; stats.wins++; }
+    else { msgEl.textContent = 'Computer wins.'; msgEl.className = 'overlay-msg bad'; stats.losses++; }
+  } else {
+    msgEl.textContent = `Player ${result.winner} wins! 🎉`;
+    msgEl.className = 'overlay-msg good';
+    stats.wins++;
+  }
+  updateStats();
+}
+
+// Unbeatable AI via minimax
+function bestMove() {
+  let best = -Infinity, move = null;
+  for (let i=0;i<9;i++) {
+    if (!cells[i]) {
+      cells[i] = 'O';
+      const score = minimax(cells, 0, false);
+      cells[i] = '';
+      if (score > best) { best = score; move = i; }
+    }
+  }
+  return move;
+}
+
+function minimax(board, depth, isMax) {
+  const res = checkResultFor(board);
+  if (res !== null) {
+    if (res === 'O') return 10 - depth;
+    if (res === 'X') return depth - 10;
+    return 0;
+  }
+  if (isMax) {
+    let best = -Infinity;
+    for (let i=0;i<9;i++) if (!board[i]) {
+      board[i] = 'O';
+      best = Math.max(best, minimax(board, depth+1, false));
+      board[i] = '';
+    }
+    return best;
+  } else {
+    let best = Infinity;
+    for (let i=0;i<9;i++) if (!board[i]) {
+      board[i] = 'X';
+      best = Math.min(best, minimax(board, depth+1, true));
+      board[i] = '';
+    }
+    return best;
+  }
+}
+
+function checkResultFor(board) {
+  for (const [a,b,c] of LINES) {
+    if (board[a] && board[a] === board[b] && board[a] === board[c]) return board[a];
+  }
+  if (board.every(c => c)) return 'draw';
+  return null;
+}
+
+modeAIBtn.addEventListener('click', () => { vsAI = true; modeAIBtn.classList.remove('secondary'); mode2PBtn.classList.add('secondary'); reset(); });
+mode2PBtn.addEventListener('click', () => { vsAI = false; mode2PBtn.classList.remove('secondary'); modeAIBtn.classList.add('secondary'); reset(); });
+restartBtn.addEventListener('click', reset);
+
+reset();
+</script>
+</body>
+</html>

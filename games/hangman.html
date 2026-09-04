@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%8E%AE%3C/text%3E%3C/svg%3E">
+<meta name="theme-color" content="#0f1220">
+<title>Hangman — Arcade Hub</title>
+<link rel="stylesheet" href="../css/style.css">
+<style>
+  .hg-word {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: 10px 0 20px;
+  }
+  .hg-letter {
+    width: clamp(24px, 6vw, 34px);
+    height: clamp(30px, 7vw, 42px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(1.1rem, 4.5vw, 1.5rem);
+    font-weight: 800;
+    border-bottom: 3px solid rgba(255,255,255,0.25);
+  }
+  .hg-letter.filled { animation: hg-letter-pop 0.35s cubic-bezier(.34,1.56,.64,1); border-color: var(--good); color: var(--good); }
+  @keyframes hg-letter-pop {
+    0% { transform: scale(0.3) rotateX(90deg); opacity: 0; }
+    60% { transform: scale(1.2) rotateX(0deg); opacity: 1; }
+    100% { transform: scale(1) rotateX(0deg); }
+  }
+  .hg-canvas-wrap { margin-bottom: 10px; }
+  .hg-keyboard { display: flex; flex-direction: column; gap: 6px; align-items: center; }
+  .hg-krow { display: flex; gap: 5px; justify-content: center; }
+  .hg-key {
+    width: clamp(24px, 8vw, 38px);
+    padding: 10px 0;
+    border-radius: 8px;
+    background: var(--card);
+    border: 1px solid rgba(255,255,255,0.08);
+    font-weight: 700;
+    cursor: pointer;
+    color: var(--text);
+    transition: background 0.1s ease, transform 0.1s ease;
+  }
+  .hg-key:hover { background: var(--card-hover); }
+  .hg-key:active { transform: scale(0.92); }
+  .hg-key.correct { background: rgba(74,222,128,0.3); color: var(--good); cursor: default; }
+  .hg-key.wrong { background: rgba(248,113,113,0.3); color: var(--bad); cursor: default; animation: hg-key-shake 0.3s ease; }
+  @keyframes hg-key-shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-3px); }
+    75% { transform: translateX(3px); }
+  }
+  .hg-category { color: var(--text-dim); font-size: 0.85rem; margin-bottom: 6px; }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="brand"><span class="dot"></span> Arcade Hub</div>
+  <a class="home-link" href="../index.html">← All games</a>
+</header>
+
+<div class="game-wrap">
+  <h1>🎯 Hangman</h1>
+  <p class="hint">Guess the word one letter at a time before you run out of tries</p>
+
+  <div class="hud">
+    <div class="pill">Wrong <span id="wrong">0</span>/6</div>
+    <div class="pill">Wins <span id="wins">0</span></div>
+    <div class="pill">Losses <span id="losses">0</span></div>
+  </div>
+
+  <div class="stage">
+    <div class="hg-canvas-wrap">
+      <canvas id="board" width="220" height="200"></canvas>
+    </div>
+    <div class="hg-category" id="category"></div>
+    <div class="hg-word" id="word"></div>
+    <div class="hg-keyboard" id="keyboard"></div>
+  </div>
+
+  <div class="overlay-msg" id="msg"></div>
+  <div style="margin-top:14px;">
+    <button class="btn" id="restartBtn">New Word</button>
+  </div>
+</div>
+
+<script>
+const WORDS = [
+  ['GUITAR','Music'], ['PYTHON','Programming'], ['GALAXY','Space'], ['VOLCANO','Nature'],
+  ['PUZZLE','Games'], ['DOLPHIN','Animals'], ['CASTLE','Places'], ['UMBRELLA','Objects'],
+  ['KEYBOARD','Objects'], ['MOUNTAIN','Nature'], ['SANDWICH','Food'], ['ROBOT','Technology'],
+  ['JOURNEY','Concepts'], ['PENGUIN','Animals'], ['THUNDER','Nature'], ['BICYCLE','Objects'],
+  ['CAMERA','Objects'], ['DESERT','Places'], ['WIZARD','Fantasy'], ['PLANET','Space'],
+  ['CHOCOLATE','Food'], ['LANTERN','Objects'], ['HARBOR','Places'], ['ORCHESTRA','Music'],
+  ['DIAMOND','Objects'], ['FOREST','Nature'], ['ROCKET','Space'], ['LIBRARY','Places']
+];
+const MAX_WRONG = 6;
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+const wordEl = document.getElementById('word');
+const categoryEl = document.getElementById('category');
+const keyboardEl = document.getElementById('keyboard');
+const wrongEl = document.getElementById('wrong');
+const winsEl = document.getElementById('wins');
+const lossesEl = document.getElementById('losses');
+const msgEl = document.getElementById('msg');
+const restartBtn = document.getElementById('restartBtn');
+
+let stats = JSON.parse(localStorage.getItem('hangman-stats') || '{"wins":0,"losses":0}');
+winsEl.textContent = stats.wins;
+lossesEl.textContent = stats.losses;
+
+let word, category, guessed, wrongCount, over;
+
+function reset() {
+  const pick = WORDS[Math.floor(Math.random() * WORDS.length)];
+  word = pick[0];
+  category = pick[1];
+  guessed = new Set();
+  wrongCount = 0;
+  partTimes = [];
+  over = false;
+  wrongEl.textContent = 0;
+  categoryEl.textContent = 'Category: ' + category;
+  msgEl.textContent = '';
+  msgEl.className = 'overlay-msg';
+  buildKeyboard();
+  renderWord();
+}
+
+const KEY_ROWS = ['QWERTYUIOP', 'ASDFGHJKL', 'ZXCVBNM'];
+
+function buildKeyboard() {
+  keyboardEl.innerHTML = '';
+  KEY_ROWS.forEach(row => {
+    const rowEl = document.createElement('div');
+    rowEl.className = 'hg-krow';
+    row.split('').forEach(letter => {
+      const b = document.createElement('button');
+      b.className = 'hg-key';
+      b.textContent = letter;
+      b.addEventListener('click', () => guess(letter));
+      rowEl.appendChild(b);
+    });
+    keyboardEl.appendChild(rowEl);
+  });
+}
+
+function renderWord(newlyGuessed) {
+  wordEl.innerHTML = '';
+  word.split('').forEach(c => {
+    const span = document.createElement('div');
+    const shown = guessed.has(c);
+    span.className = 'hg-letter' + (shown ? ' filled' : '');
+    span.textContent = shown ? c : '';
+    wordEl.appendChild(span);
+  });
+}
+
+function guess(letter) {
+  if (over || guessed.has(letter)) return;
+  guessed.add(letter);
+  const keys = [...keyboardEl.querySelectorAll('.hg-key')];
+  const key = keys.find(k => k.textContent === letter);
+
+  if (word.includes(letter)) {
+    key.classList.add('correct');
+    renderWord();
+    if (word.split('').every(c => guessed.has(c))) return finish(true);
+  } else {
+    key.classList.add('wrong');
+    wrongCount++;
+    wrongEl.textContent = wrongCount;
+    partTimes[wrongCount - 1] = performance.now();
+    if (wrongCount >= MAX_WRONG) return finish(false);
+  }
+}
+
+function finish(won) {
+  over = true;
+  if (won) {
+    stats.wins++;
+    msgEl.textContent = 'You got it! 🎉';
+    msgEl.className = 'overlay-msg good';
+  } else {
+    stats.losses++;
+    guessed = new Set(word.split(''));
+    renderWord();
+    msgEl.textContent = `Out of tries — the word was ${word}`;
+    msgEl.className = 'overlay-msg bad';
+  }
+  winsEl.textContent = stats.wins;
+  lossesEl.textContent = stats.losses;
+  localStorage.setItem('hangman-stats', JSON.stringify(stats));
+}
+
+const PARTS = [
+  { type: 'circle', cx: 150, cy: 65, r: 20 },
+  { type: 'line', x1: 150, y1: 85, x2: 150, y2: 130 },
+  { type: 'line', x1: 150, y1: 95, x2: 125, y2: 115 },
+  { type: 'line', x1: 150, y1: 95, x2: 175, y2: 115 },
+  { type: 'line', x1: 150, y1: 130, x2: 128, y2: 165 },
+  { type: 'line', x1: 150, y1: 130, x2: 172, y2: 165 },
+];
+let partTimes = [];
+const PART_ANIM_MS = 260;
+function easeOutCubic(p) { return 1 - Math.pow(1 - p, 3); }
+
+function drawGallows() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = '#eef0ff';
+  ctx.lineWidth = 4;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(20, 190); ctx.lineTo(120, 190);
+  ctx.moveTo(50, 190); ctx.lineTo(50, 20);
+  ctx.lineTo(150, 20); ctx.lineTo(150, 45);
+  ctx.stroke();
+
+  ctx.strokeStyle = '#f472b6';
+  ctx.lineWidth = 4;
+  const now = performance.now();
+  for (let i = 0; i < wrongCount; i++) {
+    const start = partTimes[i];
+    const p = start ? easeOutCubic(Math.min(1, (now - start) / PART_ANIM_MS)) : 1;
+    const part = PARTS[i];
+    ctx.beginPath();
+    if (part.type === 'circle') {
+      ctx.arc(part.cx, part.cy, part.r * p, 0, Math.PI * 2);
+    } else {
+      ctx.moveTo(part.x1, part.y1);
+      ctx.lineTo(part.x1 + (part.x2 - part.x1) * p, part.y1 + (part.y2 - part.y1) * p);
+    }
+    ctx.stroke();
+  }
+}
+
+function animLoop() {
+  drawGallows();
+  requestAnimationFrame(animLoop);
+}
+animLoop();
+
+document.addEventListener('keydown', e => {
+  const letter = e.key.toUpperCase();
+  if (letter.length === 1 && letter >= 'A' && letter <= 'Z') guess(letter);
+});
+
+restartBtn.addEventListener('click', reset);
+reset();
+</script>
+</body>
+</html>

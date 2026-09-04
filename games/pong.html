@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%8E%AE%3C/text%3E%3C/svg%3E">
+<meta name="theme-color" content="#0f1220">
+<title>Pong — Arcade Hub</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="brand"><span class="dot"></span> Arcade Hub</div>
+  <a class="home-link" href="../index.html">← All games</a>
+</header>
+
+<div class="game-wrap">
+  <h1>🏓 Pong</h1>
+  <p class="hint">Move mouse / drag finger up-down to control your paddle · Arrow keys work too</p>
+
+  <div class="hud">
+    <div class="pill">You <span id="youScore">0</span></div>
+    <div class="pill">CPU <span id="cpuScore">0</span></div>
+  </div>
+
+  <div class="stage">
+    <canvas id="board" width="480" height="320"></canvas>
+  </div>
+
+  <div class="overlay-msg" id="msg">First to 7 wins — tap board to serve</div>
+  <div style="margin-top:14px;">
+    <button class="btn" id="restartBtn">Restart Match</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+
+const youScoreEl = document.getElementById('youScore');
+const cpuScoreEl = document.getElementById('cpuScore');
+const msgEl = document.getElementById('msg');
+const restartBtn = document.getElementById('restartBtn');
+
+const PADDLE_H = 64, PADDLE_W = 10;
+const WIN_SCORE = 7;
+
+let you, cpu, ball, youScore, cpuScore, running, serving;
+
+function reset(fullMatch=true) {
+  you = { y: H/2 - PADDLE_H/2 };
+  cpu = { y: H/2 - PADDLE_H/2, speed: 3.6 };
+  if (fullMatch) { youScore = 0; cpuScore = 0; }
+  youScoreEl.textContent = youScore;
+  cpuScoreEl.textContent = cpuScore;
+  running = true;
+  serving = true;
+  resetBall();
+  msgEl.textContent = 'Tap board to serve';
+  msgEl.className = 'overlay-msg';
+}
+
+function resetBall() {
+  ball = { x: W/2, y: H/2, r: 7, dx: 0, dy: 0, speed: 4.2 };
+}
+
+function serve() {
+  if (!serving || !running) return;
+  const angle = (Math.random()*0.6 - 0.3);
+  const dir = Math.random() < 0.5 ? 1 : -1;
+  ball.dx = Math.cos(angle) * ball.speed * dir;
+  ball.dy = Math.sin(angle) * ball.speed;
+  serving = false;
+  msgEl.textContent = '';
+}
+
+canvas.addEventListener('mousedown', serve);
+canvas.addEventListener('touchstart', e => { serve(); }, { passive: true });
+
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  const scale = H / rect.height;
+  const y = (e.clientY - rect.top) * scale;
+  you.y = Math.min(Math.max(y - PADDLE_H/2, 0), H - PADDLE_H);
+});
+canvas.addEventListener('touchmove', e => {
+  const rect = canvas.getBoundingClientRect();
+  const scale = H / rect.height;
+  const y = (e.touches[0].clientY - rect.top) * scale;
+  you.y = Math.min(Math.max(y - PADDLE_H/2, 0), H - PADDLE_H);
+  e.preventDefault();
+}, { passive: false });
+
+const keys = {};
+document.addEventListener('keydown', e => {
+  keys[e.key] = true;
+  if (e.key === ' ') { serve(); e.preventDefault(); }
+  if (e.key.startsWith('Arrow')) e.preventDefault();
+});
+document.addEventListener('keyup', e => keys[e.key] = false);
+
+function update() {
+  if (!running) return;
+  if (keys.ArrowUp) you.y = Math.max(you.y - 6, 0);
+  if (keys.ArrowDown) you.y = Math.min(you.y + 6, H - PADDLE_H);
+
+  const cpuCenter = cpu.y + PADDLE_H/2;
+  if (cpuCenter < ball.y - 10) cpu.y += cpu.speed;
+  else if (cpuCenter > ball.y + 10) cpu.y -= cpu.speed;
+  cpu.y = Math.min(Math.max(cpu.y, 0), H - PADDLE_H);
+
+  if (serving) { ball.x = W/2; ball.y = H/2; return; }
+
+  ball.x += ball.dx;
+  ball.y += ball.dy;
+
+  if (ball.y - ball.r < 0) { ball.y = ball.r; ball.dy *= -1; }
+  if (ball.y + ball.r > H) { ball.y = H - ball.r; ball.dy *= -1; }
+
+  // your paddle (left side)
+  if (ball.dx < 0 && ball.x - ball.r < PADDLE_W + 10 && ball.x - ball.r > 10 &&
+      ball.y > you.y && ball.y < you.y + PADDLE_H) {
+    const hit = (ball.y - (you.y + PADDLE_H/2)) / (PADDLE_H/2);
+    ball.dx = Math.abs(ball.dx) * 1.04;
+    ball.dy = hit * ball.speed * 1.4;
+  }
+
+  // cpu paddle (right side)
+  if (ball.dx > 0 && ball.x + ball.r > W - PADDLE_W - 10 && ball.x + ball.r < W - 10 &&
+      ball.y > cpu.y && ball.y < cpu.y + PADDLE_H) {
+    const hit = (ball.y - (cpu.y + PADDLE_H/2)) / (PADDLE_H/2);
+    ball.dx = -Math.abs(ball.dx) * 1.04;
+    ball.dy = hit * ball.speed * 1.4;
+  }
+
+  if (ball.x < 0) { cpuScore++; cpuScoreEl.textContent = cpuScore; afterPoint(); }
+  if (ball.x > W) { youScore++; youScoreEl.textContent = youScore; afterPoint(); }
+}
+
+function afterPoint() {
+  if (youScore >= WIN_SCORE || cpuScore >= WIN_SCORE) {
+    running = false;
+    msgEl.textContent = youScore > cpuScore ? 'You win the match! 🎉' : 'CPU wins the match.';
+    msgEl.className = youScore > cpuScore ? 'overlay-msg good' : 'overlay-msg bad';
+    return;
+  }
+  resetBall();
+  serving = true;
+  msgEl.textContent = 'Tap board to serve';
+  msgEl.className = 'overlay-msg';
+}
+
+function draw() {
+  ctx.fillStyle = '#0b0e1c';
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.setLineDash([6, 10]);
+  ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+  ctx.beginPath();
+  ctx.moveTo(W/2, 0);
+  ctx.lineTo(W/2, H);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.fillStyle = '#22d3ee';
+  ctx.fillRect(10, you.y, PADDLE_W, PADDLE_H);
+  ctx.fillStyle = '#f472b6';
+  ctx.fillRect(W - 10 - PADDLE_W, cpu.y, PADDLE_W, PADDLE_H);
+
+  ctx.beginPath();
+  ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI*2);
+  ctx.fillStyle = '#eef0ff';
+  ctx.fill();
+}
+
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+restartBtn.addEventListener('click', () => reset(true));
+reset(true);
+loop();
+</script>
+</body>
+</html>

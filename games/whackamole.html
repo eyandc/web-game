@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%8E%AE%3C/text%3E%3C/svg%3E">
+<meta name="theme-color" content="#0f1220">
+<title>Whack-a-Mole — Arcade Hub</title>
+<link rel="stylesheet" href="../css/style.css">
+<style>
+  .wam-board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+    width: min(92vw, 420px);
+  }
+  .wam-hole {
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: radial-gradient(circle at 50% 40%, #2a1810, #120a06 70%);
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    overflow: hidden;
+    cursor: pointer;
+    position: relative;
+    box-shadow: inset 0 8px 16px rgba(0,0,0,0.6);
+  }
+  .wam-mole {
+    font-size: clamp(1.8rem, 8vw, 3rem);
+    transform: translateY(100%);
+    transition: transform 0.15s ease-out;
+  }
+  .wam-hole.up .wam-mole { transform: translateY(10%); }
+  .wam-hole.whacked .wam-mole { transform: translateY(100%) rotate(20deg) scale(0.7); transition: transform 0.25s ease-in; }
+  .wam-hole.whacked { animation: wam-shake 0.25s ease; }
+  @keyframes wam-shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+  }
+  .wam-smash {
+    position: absolute;
+    top: 30%;
+    left: 50%;
+    font-size: 2.4rem;
+    pointer-events: none;
+    transform: translate(-50%, -50%) scale(0.3);
+    opacity: 0;
+    animation: wam-smash-pop 0.45s ease-out forwards;
+    z-index: 2;
+  }
+  @keyframes wam-smash-pop {
+    0% { transform: translate(-50%, -50%) scale(0.3) rotate(-10deg); opacity: 0; }
+    35% { transform: translate(-50%, -50%) scale(1.3) rotate(6deg); opacity: 1; }
+    100% { transform: translate(-50%, -60%) scale(1) rotate(0deg); opacity: 0; }
+  }
+  .wam-score-pop {
+    position: absolute;
+    top: 10%;
+    left: 50%;
+    color: var(--good);
+    font-weight: 800;
+    font-size: 1.1rem;
+    pointer-events: none;
+    transform: translate(-50%, 0);
+    opacity: 0;
+    animation: wam-score-float 0.6s ease-out forwards;
+    z-index: 2;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.6);
+  }
+  @keyframes wam-score-float {
+    0% { transform: translate(-50%, 0); opacity: 0; }
+    20% { opacity: 1; }
+    100% { transform: translate(-50%, -34px); opacity: 0; }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="brand"><span class="dot"></span> Arcade Hub</div>
+  <a class="home-link" href="../index.html">← All games</a>
+</header>
+
+<div class="game-wrap">
+  <h1>🔨 Whack-a-Mole</h1>
+  <p class="hint">Tap or click the moles before they hide</p>
+
+  <div class="hud">
+    <div class="pill">Score <span id="score">0</span></div>
+    <div class="pill">Time <span id="time">30</span></div>
+    <div class="pill">Best <span id="best">0</span></div>
+  </div>
+
+  <div class="stage">
+    <div class="wam-board" id="board"></div>
+  </div>
+
+  <div class="overlay-msg" id="msg">Tap Start to play</div>
+  <div style="margin-top:14px;">
+    <button class="btn" id="startBtn">Start</button>
+  </div>
+</div>
+
+<script>
+const boardEl = document.getElementById('board');
+const scoreEl = document.getElementById('score');
+const timeEl = document.getElementById('time');
+const bestEl = document.getElementById('best');
+const msgEl = document.getElementById('msg');
+const startBtn = document.getElementById('startBtn');
+
+const HOLES = 9;
+let best = Number(localStorage.getItem('wam-best') || 0);
+bestEl.textContent = best;
+
+let holes = [];
+let score, timeLeft, popTimer, countdownTimer, running = false;
+
+function buildBoard() {
+  boardEl.innerHTML = '';
+  holes = [];
+  for (let i=0;i<HOLES;i++) {
+    const d = document.createElement('div');
+    d.className = 'wam-hole';
+    d.innerHTML = '<div class="wam-mole">🐹</div>';
+    d.addEventListener('click', () => whack(i));
+    boardEl.appendChild(d);
+    holes.push(d);
+  }
+}
+buildBoard();
+
+function whack(i) {
+  if (!running) return;
+  const h = holes[i];
+  if (!h.classList.contains('up') || h.classList.contains('whacked')) return;
+  h.classList.add('whacked');
+  score++;
+  scoreEl.textContent = score;
+
+  const smash = document.createElement('div');
+  smash.className = 'wam-smash';
+  smash.textContent = '💥';
+  h.appendChild(smash);
+  smash.addEventListener('animationend', () => smash.remove());
+
+  const pop = document.createElement('div');
+  pop.className = 'wam-score-pop';
+  pop.textContent = '+1';
+  h.appendChild(pop);
+  pop.addEventListener('animationend', () => pop.remove());
+
+  setTimeout(() => h.classList.remove('up', 'whacked'), 200);
+}
+
+function popRandom() {
+  if (!running) return;
+  holes.forEach(h => h.classList.remove('up', 'whacked'));
+  const i = Math.floor(Math.random() * HOLES);
+  holes[i].classList.add('up');
+  const showTime = Math.max(450, 900 - score * 15);
+  setTimeout(() => holes[i].classList.remove('up'), showTime);
+  popTimer = setTimeout(popRandom, showTime * 0.85);
+}
+
+function start() {
+  score = 0; timeLeft = 30; running = true;
+  scoreEl.textContent = score;
+  timeEl.textContent = timeLeft;
+  msgEl.textContent = '';
+  msgEl.className = 'overlay-msg';
+  startBtn.textContent = 'Restart';
+  clearTimeout(popTimer);
+  clearInterval(countdownTimer);
+  popRandom();
+  countdownTimer = setInterval(() => {
+    timeLeft--;
+    timeEl.textContent = timeLeft;
+    if (timeLeft <= 0) endGame();
+  }, 1000);
+}
+
+function endGame() {
+  running = false;
+  clearTimeout(popTimer);
+  clearInterval(countdownTimer);
+  holes.forEach(h => h.classList.remove('up', 'whacked'));
+  if (score > best) { best = score; localStorage.setItem('wam-best', best); bestEl.textContent = best; }
+  msgEl.textContent = `Time's up! Final score: ${score}`;
+  msgEl.className = 'overlay-msg good';
+}
+
+startBtn.addEventListener('click', start);
+</script>
+</body>
+</html>

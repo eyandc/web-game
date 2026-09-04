@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%8E%AE%3C/text%3E%3C/svg%3E">
+<meta name="theme-color" content="#0f1220">
+<title>Snake — Arcade Hub</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="brand"><span class="dot"></span> Arcade Hub</div>
+  <a class="home-link" href="../index.html">← All games</a>
+</header>
+
+<div class="game-wrap">
+  <h1>🐍 Snake</h1>
+  <p class="hint">Arrow keys / WASD on PC · Swipe or D-pad on mobile · Edges wrap around!</p>
+
+  <div class="hud">
+    <div class="pill">Score <span id="score">0</span></div>
+    <div class="pill">Best <span id="best">0</span></div>
+  </div>
+
+  <div class="stage">
+    <canvas id="board" width="400" height="400"></canvas>
+  </div>
+
+  <div class="overlay-msg" id="msg"></div>
+  <div style="margin-top:14px;">
+    <button class="btn" id="restartBtn">Restart</button>
+  </div>
+
+  <div class="dpad mobile-only">
+    <button class="up" data-dir="up">▲</button>
+    <button class="left" data-dir="left">◀</button>
+    <button class="down" data-dir="down">▼</button>
+    <button class="right" data-dir="right">▶</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+const cell = 20;
+const cols = canvas.width / cell;
+const rows = canvas.height / cell;
+
+const scoreEl = document.getElementById('score');
+const bestEl = document.getElementById('best');
+const msgEl = document.getElementById('msg');
+const restartBtn = document.getElementById('restartBtn');
+
+let best = Number(localStorage.getItem('snake-best') || 0);
+bestEl.textContent = best;
+
+let snake, dir, nextDir, food, score, alive, tickMs, timer, wraps;
+
+function reset() {
+  snake = [{x: 8, y: 10}, {x: 7, y: 10}, {x: 6, y: 10}];
+  dir = 'right';
+  nextDir = 'right';
+  score = 0;
+  alive = true;
+  tickMs = 130;
+  wraps = [];
+  scoreEl.textContent = score;
+  msgEl.textContent = '';
+  msgEl.className = 'overlay-msg';
+  placeFood();
+  clearInterval(timer);
+  timer = setInterval(tick, tickMs);
+}
+
+function placeFood() {
+  while (true) {
+    const f = { x: Math.floor(Math.random() * cols), y: Math.floor(Math.random() * rows) };
+    if (!snake.some(s => s.x === f.x && s.y === f.y)) { food = f; return; }
+  }
+}
+
+function setDir(d) {
+  const opposite = { up: 'down', down: 'up', left: 'right', right: 'left' };
+  if (opposite[d] !== dir) nextDir = d;
+}
+
+document.addEventListener('keydown', e => {
+  const map = { ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+                w: 'up', s: 'down', a: 'left', d: 'right' };
+  if (map[e.key]) { setDir(map[e.key]); e.preventDefault(); }
+});
+
+document.querySelectorAll('.dpad button').forEach(b => {
+  b.addEventListener('touchstart', e => { e.preventDefault(); setDir(b.dataset.dir); }, { passive: false });
+  b.addEventListener('click', () => setDir(b.dataset.dir));
+});
+
+let touchStart = null;
+canvas.addEventListener('touchstart', e => {
+  const t = e.touches[0];
+  touchStart = { x: t.clientX, y: t.clientY };
+}, { passive: true });
+canvas.addEventListener('touchend', e => {
+  if (!touchStart) return;
+  const t = e.changedTouches[0];
+  const dx = t.clientX - touchStart.x;
+  const dy = t.clientY - touchStart.y;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) > 20) {
+    if (Math.abs(dx) > Math.abs(dy)) setDir(dx > 0 ? 'right' : 'left');
+    else setDir(dy > 0 ? 'down' : 'up');
+  }
+  touchStart = null;
+});
+
+function tick() {
+  if (!alive) return;
+  dir = nextDir;
+  const head = { ...snake[0] };
+  if (dir === 'up') head.y--;
+  if (dir === 'down') head.y++;
+  if (dir === 'left') head.x--;
+  if (dir === 'right') head.x++;
+
+  let wrapped = false;
+  if (head.x < 0) { head.x = cols - 1; wrapped = true; }
+  else if (head.x >= cols) { head.x = 0; wrapped = true; }
+  if (head.y < 0) { head.y = rows - 1; wrapped = true; }
+  else if (head.y >= rows) { head.y = 0; wrapped = true; }
+
+  if (snake.some(s => s.x === head.x && s.y === head.y)) {
+    return gameOver();
+  }
+
+  if (wrapped) {
+    wraps.push({ x: head.x, y: head.y, t: performance.now() });
+    if (wraps.length > 6) wraps.shift();
+  }
+
+  snake.unshift(head);
+  if (head.x === food.x && head.y === food.y) {
+    score++;
+    scoreEl.textContent = score;
+    placeFood();
+    if (tickMs > 60 && score % 3 === 0) {
+      tickMs -= 6;
+      clearInterval(timer);
+      timer = setInterval(tick, tickMs);
+    }
+  } else {
+    snake.pop();
+  }
+}
+
+function gameOver() {
+  alive = false;
+  clearInterval(timer);
+  if (score > best) {
+    best = score;
+    localStorage.setItem('snake-best', best);
+    bestEl.textContent = best;
+  }
+  msgEl.textContent = 'Game Over — tap Restart';
+  msgEl.className = 'overlay-msg bad';
+}
+
+const WRAP_FADE_MS = 450;
+
+function draw() {
+  ctx.fillStyle = '#0b0e1c';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const now = performance.now();
+  wraps = wraps.filter(w => now - w.t < WRAP_FADE_MS);
+  wraps.forEach(w => {
+    const p = 1 - (now - w.t) / WRAP_FADE_MS;
+    const cx = w.x * cell + cell / 2, cy = w.y * cell + cell / 2;
+    const r = cell * (0.6 + (1 - p) * 1.6);
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
+    grad.addColorStop(0, `rgba(34, 211, 238, ${0.55 * p})`);
+    grad.addColorStop(1, 'rgba(34, 211, 238, 0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  ctx.fillStyle = '#f472b6';
+  ctx.fillRect(food.x * cell + 2, food.y * cell + 2, cell - 4, cell - 4);
+
+  snake.forEach((s, i) => {
+    ctx.fillStyle = i === 0 ? '#22d3ee' : '#7c5cff';
+    ctx.fillRect(s.x * cell + 1, s.y * cell + 1, cell - 2, cell - 2);
+  });
+}
+
+function loop() {
+  draw();
+  requestAnimationFrame(loop);
+}
+
+restartBtn.addEventListener('click', reset);
+reset();
+loop();
+</script>
+</body>
+</html>

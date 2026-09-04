@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%8E%AE%3C/text%3E%3C/svg%3E">
+<meta name="theme-color" content="#0f1220">
+<title>Slide Puzzle — Arcade Hub</title>
+<link rel="stylesheet" href="../css/style.css">
+<style>
+  .sp-board {
+    display: grid;
+    gap: 6px;
+    background: #0b0e1c;
+    padding: 8px;
+    border-radius: 10px;
+    width: min(90vw, 360px);
+    height: min(90vw, 360px);
+  }
+  .sp-tile {
+    border-radius: 8px;
+    background: linear-gradient(135deg, #7c5cff, #22d3ee);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: clamp(1.2rem, 5vw, 1.8rem);
+    color: #10122a;
+    cursor: pointer;
+    transition: transform 0.08s ease;
+  }
+  .sp-tile:active { transform: scale(0.96); }
+  .sp-tile.blank { background: transparent; cursor: default; }
+  .mode-row { display:flex; justify-content:center; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="brand"><span class="dot"></span> Arcade Hub</div>
+  <a class="home-link" href="../index.html">← All games</a>
+</header>
+
+<div class="game-wrap">
+  <h1>🧩 Slide Puzzle</h1>
+  <p class="hint">Tap a tile next to the empty spot to slide it — put the numbers in order</p>
+
+  <div class="mode-row">
+    <button class="btn secondary" id="easyBtn">Easy 3×3</button>
+    <button class="btn secondary" id="hardBtn">Hard 4×4</button>
+  </div>
+
+  <div class="hud">
+    <div class="pill">Moves <span id="moves">0</span></div>
+    <div class="pill">Time <span id="time">0s</span></div>
+    <div class="pill">Best <span id="best">–</span></div>
+  </div>
+
+  <div class="stage">
+    <div class="sp-board" id="board"></div>
+  </div>
+
+  <div class="overlay-msg" id="msg"></div>
+  <div style="margin-top:14px;">
+    <button class="btn" id="restartBtn">Shuffle</button>
+  </div>
+</div>
+
+<script>
+const boardEl = document.getElementById('board');
+const movesEl = document.getElementById('moves');
+const timeEl = document.getElementById('time');
+const bestEl = document.getElementById('best');
+const msgEl = document.getElementById('msg');
+const restartBtn = document.getElementById('restartBtn');
+const easyBtn = document.getElementById('easyBtn');
+const hardBtn = document.getElementById('hardBtn');
+
+let size = 3;
+let tiles, moves, seconds, timer, over;
+
+function bestKey() { return 'slide-best-' + size; }
+
+function solvedTiles() {
+  const t = [];
+  for (let i = 1; i < size*size; i++) t.push(i);
+  t.push(0);
+  return t;
+}
+
+function reset() {
+  clearInterval(timer);
+  seconds = 0;
+  moves = 0;
+  over = false;
+  movesEl.textContent = 0;
+  timeEl.textContent = '0s';
+  msgEl.textContent = '';
+  msgEl.className = 'overlay-msg';
+  const best = localStorage.getItem(bestKey());
+  bestEl.textContent = best ? best + ' moves' : '–';
+
+  tiles = solvedTiles();
+  shuffle();
+
+  boardEl.style.gridTemplateColumns = `repeat(${size}, 1fr)`;
+  boardEl.style.gridTemplateRows = `repeat(${size}, 1fr)`;
+  render();
+}
+
+function shuffle() {
+  let blank = tiles.indexOf(0);
+  for (let i = 0; i < 300; i++) {
+    const neighbors = neighborIndices(blank);
+    const swap = neighbors[Math.floor(Math.random() * neighbors.length)];
+    [tiles[blank], tiles[swap]] = [tiles[swap], tiles[blank]];
+    blank = swap;
+  }
+}
+
+function neighborIndices(i) {
+  const r = Math.floor(i / size), c = i % size;
+  const list = [];
+  if (r > 0) list.push(i - size);
+  if (r < size - 1) list.push(i + size);
+  if (c > 0) list.push(i - 1);
+  if (c < size - 1) list.push(i + 1);
+  return list;
+}
+
+function render() {
+  boardEl.innerHTML = '';
+  tiles.forEach((v, i) => {
+    const d = document.createElement('div');
+    d.className = 'sp-tile' + (v === 0 ? ' blank' : '');
+    d.textContent = v === 0 ? '' : v;
+    d.addEventListener('click', () => tryMove(i));
+    boardEl.appendChild(d);
+  });
+}
+
+function tryMove(i) {
+  if (over) return;
+  const blank = tiles.indexOf(0);
+  if (neighborIndices(blank).includes(i)) {
+    [tiles[blank], tiles[i]] = [tiles[i], tiles[blank]];
+    moves++;
+    movesEl.textContent = moves;
+    render();
+    if (moves === 1) startTimer();
+    checkWin();
+  }
+}
+
+function startTimer() {
+  clearInterval(timer);
+  timer = setInterval(() => { seconds++; timeEl.textContent = seconds + 's'; }, 1000);
+}
+
+function checkWin() {
+  const solved = solvedTiles();
+  if (tiles.every((v, i) => v === solved[i])) {
+    over = true;
+    clearInterval(timer);
+    msgEl.textContent = `Solved in ${moves} moves, ${seconds}s! 🎉`;
+    msgEl.className = 'overlay-msg good';
+    const best = Number(localStorage.getItem(bestKey()) || Infinity);
+    if (moves < best) {
+      localStorage.setItem(bestKey(), moves);
+      bestEl.textContent = moves + ' moves';
+    }
+  }
+}
+
+easyBtn.addEventListener('click', () => { size = 3; easyBtn.classList.remove('secondary'); hardBtn.classList.add('secondary'); reset(); });
+hardBtn.addEventListener('click', () => { size = 4; hardBtn.classList.remove('secondary'); easyBtn.classList.add('secondary'); reset(); });
+restartBtn.addEventListener('click', reset);
+
+easyBtn.classList.remove('secondary');
+reset();
+</script>
+</body>
+</html>

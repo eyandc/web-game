@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%8E%AE%3C/text%3E%3C/svg%3E">
+<meta name="theme-color" content="#0f1220">
+<title>Reaction Test — Arcade Hub</title>
+<link rel="stylesheet" href="../css/style.css">
+<style>
+  .rt-pad {
+    width: min(90vw, 420px);
+    height: 260px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    font-weight: 800;
+    cursor: pointer;
+    user-select: none;
+    text-align: center;
+    padding: 20px;
+    transition: background 0.1s ease;
+  }
+  .rt-pad.wait { background: #f87171; }
+  .rt-pad.ready { background: #facc15; color: #1a1a1a; }
+  .rt-pad.go { background: #4ade80; color: #1a1a1a; }
+  .rt-pad.idle { background: var(--card); }
+  .rt-history { color: var(--text-dim); font-size: 0.85rem; margin-top: 14px; }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="brand"><span class="dot"></span> Arcade Hub</div>
+  <a class="home-link" href="../index.html">← All games</a>
+</header>
+
+<div class="game-wrap">
+  <h1>⚡ Reaction Test</h1>
+  <p class="hint">Wait for green, then tap or click as fast as you can</p>
+
+  <div class="hud">
+    <div class="pill">Last <span id="last">–</span></div>
+    <div class="pill">Best <span id="best">–</span></div>
+    <div class="pill">Round <span id="round">0</span>/5</div>
+  </div>
+
+  <div class="stage">
+    <div class="rt-pad idle" id="pad">Tap to start</div>
+  </div>
+
+  <div class="rt-history" id="history"></div>
+  <div class="overlay-msg" id="msg"></div>
+</div>
+
+<script>
+const pad = document.getElementById('pad');
+const lastEl = document.getElementById('last');
+const bestEl = document.getElementById('best');
+const roundEl = document.getElementById('round');
+const historyEl = document.getElementById('history');
+const msgEl = document.getElementById('msg');
+
+let best = Number(localStorage.getItem('reaction-best') || 0);
+bestEl.textContent = best ? best + 'ms' : '–';
+
+let state = 'idle'; // idle, waiting, ready, go
+let startTime, timeoutId;
+let round = 0, results = [];
+const MAX_ROUNDS = 5;
+
+function setState(s, text, cls) {
+  state = s;
+  pad.className = 'rt-pad ' + cls;
+  pad.textContent = text;
+}
+
+function begin() {
+  if (round >= MAX_ROUNDS) { round = 0; results = []; }
+  roundEl.textContent = round;
+  msgEl.textContent = '';
+  msgEl.className = 'overlay-msg';
+  setState('waiting', 'Wait for green…', 'wait');
+  const delay = 800 + Math.random() * 2200;
+  timeoutId = setTimeout(() => {
+    setState('go', 'CLICK / TAP!', 'go');
+    startTime = performance.now();
+  }, delay);
+}
+
+function handleTap() {
+  if (state === 'idle') { begin(); return; }
+  if (state === 'waiting') {
+    clearTimeout(timeoutId);
+    setState('idle', 'Too soon! Tap to retry', 'idle');
+    msgEl.textContent = 'You clicked before green — false start.';
+    msgEl.className = 'overlay-msg bad';
+    return;
+  }
+  if (state === 'go') {
+    const time = Math.round(performance.now() - startTime);
+    results.push(time);
+    round++;
+    roundEl.textContent = round;
+    lastEl.textContent = time + 'ms';
+    if (!best || time < best) { best = time; localStorage.setItem('reaction-best', best); bestEl.textContent = best + 'ms'; }
+    historyEl.textContent = 'Times: ' + results.join('ms, ') + 'ms';
+
+    if (round >= MAX_ROUNDS) {
+      const avg = Math.round(results.reduce((a,b) => a+b, 0) / results.length);
+      setState('idle', 'Tap to play again', 'idle');
+      msgEl.textContent = `Average over ${MAX_ROUNDS} rounds: ${avg}ms`;
+      msgEl.className = 'overlay-msg good';
+    } else {
+      setState('ready', 'Nice! Tap for next round', 'ready');
+    }
+  } else if (state === 'ready') {
+    begin();
+  }
+}
+
+pad.addEventListener('click', handleTap);
+pad.addEventListener('touchstart', e => { e.preventDefault(); handleTap(); }, { passive: false });
+</script>
+</body>
+</html>

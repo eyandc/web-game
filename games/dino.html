@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%8E%AE%3C/text%3E%3C/svg%3E">
+<meta name="theme-color" content="#0f1220">
+<title>Dino Runner — Arcade Hub</title>
+<link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+<header class="site-header">
+  <div class="brand"><span class="dot"></span> Arcade Hub</div>
+  <a class="home-link" href="../index.html">← All games</a>
+</header>
+
+<div class="game-wrap">
+  <h1>🦖 Dino Runner</h1>
+  <p class="hint">Tap, click, or press Space / Up to jump over obstacles</p>
+
+  <div class="hud">
+    <div class="pill">Score <span id="score">0</span></div>
+    <div class="pill">Best <span id="best">0</span></div>
+  </div>
+
+  <div class="stage">
+    <canvas id="board" width="480" height="240"></canvas>
+  </div>
+
+  <div class="overlay-msg" id="msg">Tap the board to start</div>
+</div>
+
+<script>
+const canvas = document.getElementById('board');
+const ctx = canvas.getContext('2d');
+const W = canvas.width, H = canvas.height;
+const GROUND_Y = H - 30;
+
+const scoreEl = document.getElementById('score');
+const bestEl = document.getElementById('best');
+const msgEl = document.getElementById('msg');
+
+let best = Number(localStorage.getItem('dino-best') || 0);
+bestEl.textContent = best;
+
+const GRAVITY = 0.7;
+const JUMP_V = -12.5;
+const DINO_SIZE = 30;
+
+let dino, obstacles, speed, score, running, spawnTimer, runDist;
+
+function reset() {
+  dino = { x: 50, y: GROUND_Y - DINO_SIZE, vy: 0, onGround: true };
+  obstacles = [];
+  speed = 5.5;
+  score = 0;
+  running = true;
+  spawnTimer = 0;
+  runDist = 0;
+  scoreEl.textContent = 0;
+  msgEl.textContent = 'Tap the board to start';
+  msgEl.className = 'overlay-msg';
+}
+
+function jump() {
+  if (!running) { reset(); return; }
+  if (dino.onGround) {
+    dino.vy = JUMP_V;
+    dino.onGround = false;
+  }
+  msgEl.textContent = '';
+}
+
+canvas.addEventListener('mousedown', jump);
+canvas.addEventListener('touchstart', e => { e.preventDefault(); jump(); }, { passive: false });
+document.addEventListener('keydown', e => {
+  if (e.key === ' ' || e.key === 'ArrowUp') { e.preventDefault(); jump(); }
+});
+
+function spawnObstacle() {
+  const tall = Math.random() < 0.3;
+  obstacles.push({
+    x: W + 10,
+    w: tall ? 18 : 24,
+    h: tall ? 40 : 24,
+    y: GROUND_Y - (tall ? 40 : 24)
+  });
+}
+
+function update() {
+  if (!running) return;
+
+  dino.vy += GRAVITY;
+  dino.y += dino.vy;
+  if (dino.y >= GROUND_Y - DINO_SIZE) {
+    dino.y = GROUND_Y - DINO_SIZE;
+    dino.vy = 0;
+    dino.onGround = true;
+  }
+  if (dino.onGround) runDist += speed;
+
+  spawnTimer--;
+  if (spawnTimer <= 0) {
+    spawnObstacle();
+    spawnTimer = 60 + Math.random() * 50 - speed * 3;
+  }
+
+  obstacles.forEach(o => o.x -= speed);
+  obstacles = obstacles.filter(o => o.x + o.w > -10);
+
+  speed += 0.0025;
+  score += 1;
+  scoreEl.textContent = Math.floor(score / 5);
+
+  for (const o of obstacles) {
+    if (dino.x + DINO_SIZE*0.7 > o.x && dino.x + DINO_SIZE*0.3 < o.x + o.w &&
+        dino.y + DINO_SIZE > o.y) {
+      return die();
+    }
+  }
+}
+
+function die() {
+  running = false;
+  const finalScore = Math.floor(score / 5);
+  if (finalScore > best) { best = finalScore; localStorage.setItem('dino-best', best); bestEl.textContent = best; }
+  msgEl.textContent = `Game Over — score ${finalScore}. Tap to retry`;
+  msgEl.className = 'overlay-msg bad';
+}
+
+function drawDino() {
+  const x = dino.x, y = dino.y, s = DINO_SIZE;
+  ctx.fillStyle = '#4ade80';
+
+  // tail
+  ctx.beginPath();
+  ctx.moveTo(x + 4, y + s * 0.5);
+  ctx.lineTo(x - 7, y + s * 0.38);
+  ctx.lineTo(x + 4, y + s * 0.68);
+  ctx.closePath();
+  ctx.fill();
+
+  // body
+  ctx.fillRect(x + s * 0.12, y + s * 0.35, s * 0.5, s * 0.45);
+  // neck/head
+  ctx.fillRect(x + s * 0.5, y + s * 0.05, s * 0.42, s * 0.42);
+  // snout
+  ctx.fillRect(x + s * 0.86, y + s * 0.28, s * 0.16, s * 0.14);
+  // small arm
+  ctx.fillRect(x + s * 0.5, y + s * 0.5, s * 0.14, s * 0.08);
+
+  // eye
+  ctx.fillStyle = '#0b0e1c';
+  ctx.fillRect(x + s * 0.78, y + s * 0.16, s * 0.08, s * 0.08);
+
+  ctx.fillStyle = '#3fae6d';
+  if (!dino.onGround) {
+    // tucked legs mid-air
+    ctx.fillRect(x + s * 0.2, y + s * 0.78, s * 0.18, s * 0.16);
+    ctx.fillRect(x + s * 0.42, y + s * 0.78, s * 0.18, s * 0.16);
+  } else {
+    const stride = Math.floor(runDist / 9) % 2 === 0;
+    const legA = stride ? s * 0.28 : s * 0.16;
+    const legB = stride ? s * 0.16 : s * 0.28;
+    ctx.fillRect(x + s * 0.2, y + s * 0.8, s * 0.14, legA);
+    ctx.fillRect(x + s * 0.42, y + s * 0.8, s * 0.14, legB);
+  }
+}
+
+function drawCactus(o) {
+  ctx.fillStyle = '#3fae6d';
+  ctx.fillRect(o.x + o.w * 0.32, o.y, o.w * 0.36, o.h);
+  ctx.fillRect(o.x, o.y + o.h * 0.28, o.w * 0.38, o.h * 0.2);
+  ctx.fillRect(o.x, o.y + o.h * 0.1, o.w * 0.16, o.h * 0.35);
+  ctx.fillRect(o.x + o.w * 0.62, o.y + o.h * 0.12, o.w * 0.38, o.h * 0.2);
+  ctx.fillRect(o.x + o.w * 0.84, o.y - o.h * 0.02, o.w * 0.16, o.h * 0.35);
+}
+
+function draw() {
+  ctx.fillStyle = '#0b0e1c';
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+  ctx.beginPath();
+  ctx.moveTo(0, GROUND_Y);
+  ctx.lineTo(W, GROUND_Y);
+  ctx.stroke();
+
+  drawDino();
+  obstacles.forEach(drawCactus);
+}
+
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+reset();
+loop();
+</script>
+</body>
+</html>

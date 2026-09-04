@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27%3E%3Ctext y=%27.9em%27 font-size=%2790%27%3E%F0%9F%8E%AE%3C/text%3E%3C/svg%3E">
+<meta name="theme-color" content="#0f1220">
+<title>Memory Match — Arcade Hub</title>
+<link rel="stylesheet" href="../css/style.css">
+<style>
+  .mem-board {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    width: min(92vw, 400px);
+  }
+  .mem-board.medium { grid-template-columns: repeat(5, 1fr); width: min(94vw, 460px); }
+  .mem-board.big { grid-template-columns: repeat(6, 1fr); width: min(96vw, 540px); }
+  .mem-card {
+    aspect-ratio: 1;
+    cursor: pointer;
+    user-select: none;
+    perspective: 600px;
+  }
+  .mem-card-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    transform-style: preserve-3d;
+    transition: transform 0.45s cubic-bezier(.4,.2,.2,1);
+  }
+  .mem-card.flipped .mem-card-inner { transform: rotateY(180deg); }
+  .mem-card.matched .mem-card-inner { animation: mem-match-pulse 0.5s ease; }
+  .mem-card.mismatch .mem-card-inner { animation: mem-shake 0.4s ease; }
+  .mem-card .face {
+    position: absolute;
+    inset: 0;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: clamp(1.2rem, 5vw, 2rem);
+    backface-visibility: hidden;
+  }
+  .mem-card .back {
+    background: linear-gradient(135deg, #7c5cff, #22d3ee);
+  }
+  .mem-card .front {
+    background: #1c2140;
+    border: 1px solid rgba(255,255,255,0.1);
+    transform: rotateY(180deg);
+  }
+  .mem-card.matched .front {
+    background: rgba(74, 222, 128, 0.18);
+    border-color: var(--good);
+  }
+  .mem-card.matched { cursor: default; }
+  .mem-card.matched .mem-card-inner { opacity: 0.75; }
+
+  @keyframes mem-match-pulse {
+    0% { transform: rotateY(180deg) scale(1); }
+    50% { transform: rotateY(180deg) scale(1.12); filter: drop-shadow(0 0 10px rgba(74,222,128,0.8)); }
+    100% { transform: rotateY(180deg) scale(1); }
+  }
+  @keyframes mem-shake {
+    0%, 100% { transform: rotateY(180deg) translateX(0); }
+    25% { transform: rotateY(180deg) translateX(-6px); }
+    75% { transform: rotateY(180deg) translateX(6px); }
+  }
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="brand"><span class="dot"></span> Arcade Hub</div>
+  <a class="home-link" href="../index.html">← All games</a>
+</header>
+
+<div class="game-wrap">
+  <h1>🃏 Memory Match</h1>
+  <p class="hint">Flip two cards, find every pair</p>
+
+  <div class="mode-row" style="display:flex;justify-content:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+    <button class="btn secondary" id="easyBtn">Easy (4×4)</button>
+    <button class="btn secondary" id="mediumBtn">Medium (4×5)</button>
+    <button class="btn secondary" id="hardBtn">Hard (6×6)</button>
+  </div>
+
+  <div class="hud">
+    <div class="pill">Moves <span id="moves">0</span></div>
+    <div class="pill">Time <span id="time">0s</span></div>
+    <div class="pill">Best <span id="best">–</span></div>
+  </div>
+
+  <div class="stage">
+    <div class="mem-board" id="board"></div>
+  </div>
+
+  <div class="overlay-msg" id="msg"></div>
+  <div style="margin-top:14px;">
+    <button class="btn" id="restartBtn">New Game</button>
+  </div>
+</div>
+
+<script>
+const boardEl = document.getElementById('board');
+const movesEl = document.getElementById('moves');
+const timeEl = document.getElementById('time');
+const bestEl = document.getElementById('best');
+const msgEl = document.getElementById('msg');
+const restartBtn = document.getElementById('restartBtn');
+const easyBtn = document.getElementById('easyBtn');
+const mediumBtn = document.getElementById('mediumBtn');
+const hardBtn = document.getElementById('hardBtn');
+
+const EMOJI = ['🍎','🍋','🍇','🍓','🍒','🍉','🥝','🍑','🥕','🌽','🍄','🍩','⚽','🏀','🎲','🎯','🚀','⭐','🎈','🎧'];
+
+const LEVELS = {
+  easy: { pairs: 8, className: '' },
+  medium: { pairs: 10, className: ' medium' },
+  hard: { pairs: 18, className: ' big' },
+};
+let level = 'easy';
+let cards = [], flipped = [], matchedCount = 0, moves = 0, timer, seconds = 0, locked = false;
+
+function bestKey() { return 'memory-best-' + level; }
+
+function reset() {
+  clearInterval(timer);
+  seconds = 0;
+  moves = 0;
+  matchedCount = 0;
+  locked = false;
+  flipped = [];
+  movesEl.textContent = 0;
+  timeEl.textContent = '0s';
+  msgEl.textContent = '';
+  msgEl.className = 'overlay-msg';
+  const best = localStorage.getItem(bestKey());
+  bestEl.textContent = best ? best + ' moves' : '–';
+
+  const pairsNeeded = LEVELS[level].pairs;
+  const pool = EMOJI.slice(0, pairsNeeded);
+  cards = [...pool, ...pool]
+    .map(v => ({ value: v, flipped: false, matched: false, mismatch: false }))
+    .sort(() => Math.random() - 0.5);
+
+  boardEl.className = 'mem-board' + LEVELS[level].className;
+  render();
+  timer = setInterval(() => { seconds++; timeEl.textContent = seconds + 's'; }, 1000);
+}
+
+function render() {
+  boardEl.innerHTML = '';
+  cards.forEach((c, i) => {
+    const d = document.createElement('div');
+    d.className = 'mem-card' + (c.flipped ? ' flipped' : '') + (c.matched ? ' matched' : '') + (c.mismatch ? ' mismatch' : '');
+    d.innerHTML = `<div class="mem-card-inner"><div class="face back">❔</div><div class="face front">${c.value}</div></div>`;
+    d.addEventListener('click', () => flipCard(i));
+    boardEl.appendChild(d);
+  });
+}
+
+function flipCard(i) {
+  if (locked) return;
+  const c = cards[i];
+  if (c.flipped || c.matched) return;
+  c.flipped = true;
+  flipped.push(i);
+  render();
+
+  if (flipped.length === 2) {
+    moves++;
+    movesEl.textContent = moves;
+    const [a, b] = flipped;
+    if (cards[a].value === cards[b].value) {
+      cards[a].matched = true;
+      cards[b].matched = true;
+      matchedCount += 2;
+      flipped = [];
+      render();
+      if (matchedCount === cards.length) finishGame();
+    } else {
+      locked = true;
+      setTimeout(() => {
+        cards[a].mismatch = true;
+        cards[b].mismatch = true;
+        render();
+        setTimeout(() => {
+          cards[a].flipped = false;
+          cards[b].flipped = false;
+          cards[a].mismatch = false;
+          cards[b].mismatch = false;
+          flipped = [];
+          locked = false;
+          render();
+        }, 420);
+      }, 550);
+    }
+  }
+}
+
+function finishGame() {
+  clearInterval(timer);
+  msgEl.textContent = `Solved in ${moves} moves and ${seconds}s! 🎉`;
+  msgEl.className = 'overlay-msg good';
+  const best = Number(localStorage.getItem(bestKey()) || Infinity);
+  if (moves < best) {
+    localStorage.setItem(bestKey(), moves);
+    bestEl.textContent = moves + ' moves';
+  }
+}
+
+function selectLevel(newLevel, btn) {
+  level = newLevel;
+  [easyBtn, mediumBtn, hardBtn].forEach(b => b.classList.add('secondary'));
+  btn.classList.remove('secondary');
+  reset();
+}
+
+easyBtn.addEventListener('click', () => selectLevel('easy', easyBtn));
+mediumBtn.addEventListener('click', () => selectLevel('medium', mediumBtn));
+hardBtn.addEventListener('click', () => selectLevel('hard', hardBtn));
+restartBtn.addEventListener('click', reset);
+
+easyBtn.classList.remove('secondary');
+reset();
+</script>
+</body>
+</html>
