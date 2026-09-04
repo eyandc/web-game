@@ -15,9 +15,10 @@
     grid-template-rows: repeat(8, 1fr);
     width: min(92vw, 480px);
     aspect-ratio: 1;
-    border-radius: 10px;
+    border-radius: 6px;
     overflow: hidden;
-    border: 1px solid rgba(255,255,255,0.1);
+    border: 1px solid rgba(0,0,0,0.4);
+    box-shadow: var(--shadow);
     touch-action: none;
   }
   .cx-sq {
@@ -27,57 +28,58 @@
     justify-content: center;
     cursor: pointer;
   }
-  .cx-sq.light { background: #5b6699; }
-  .cx-sq.dark { background: #1b1f3a; }
-  .cx-sq.selected { box-shadow: inset 0 0 0 3px var(--accent2); }
-  .cx-sq.last-move { box-shadow: inset 0 0 0 999px rgba(250, 204, 21, 0.2); }
+  .cx-sq.light { background: #eeeed2; }
+  .cx-sq.dark { background: #769656; }
+  .cx-sq.selected { box-shadow: inset 0 0 0 3px rgba(32, 110, 220, 0.85); }
+  .cx-sq.last-move { box-shadow: inset 0 0 0 999px rgba(255, 214, 0, 0.38); }
   .cx-sq.in-check { animation: cx-check-pulse 1s ease-in-out infinite; }
   @keyframes cx-check-pulse {
-    0%, 100% { box-shadow: inset 0 0 0 999px rgba(248, 113, 113, 0.22); }
-    50% { box-shadow: inset 0 0 0 999px rgba(248, 113, 113, 0.5); }
+    0%, 100% { box-shadow: inset 0 0 0 999px rgba(217, 33, 33, 0.35); }
+    50% { box-shadow: inset 0 0 0 999px rgba(217, 33, 33, 0.62); }
   }
   .cx-dot {
     position: absolute;
-    width: 26%; height: 26%;
+    width: 30%; height: 30%;
     border-radius: 50%;
-    background: rgba(74, 222, 128, 0.7);
-    box-shadow: 0 0 0 2px rgba(11,14,28,0.5);
+    background: rgba(20, 20, 20, 0.32);
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.6);
     pointer-events: none;
   }
   .cx-ring {
     position: absolute;
-    inset: 6%;
+    inset: 7%;
     border-radius: 50%;
-    border: 4px solid rgba(248, 113, 113, 0.75);
+    border: 5px solid rgba(217, 33, 33, 0.55);
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.55);
     box-sizing: border-box;
     pointer-events: none;
   }
-  .cx-piece-bg {
+  .cx-coord {
     position: absolute;
-    width: 76%;
-    height: 76%;
-    border-radius: 50%;
+    font-size: 0.62rem;
+    font-weight: 800;
     pointer-events: none;
-  }
-  .cx-piece-bg.w { background: radial-gradient(circle, rgba(6,8,16,0.5) 0%, rgba(6,8,16,0.28) 55%, rgba(6,8,16,0) 75%); }
-  .cx-piece-bg.b { background: radial-gradient(circle, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.2) 55%, rgba(255,255,255,0) 75%); }
-  .cx-piece {
-    position: relative;
-    font-size: clamp(1.75rem, 8vw, 2.7rem);
     line-height: 1;
     user-select: none;
+  }
+  .cx-coord.rank { top: 3px; left: 4px; }
+  .cx-coord.file { bottom: 2px; right: 4px; }
+  .cx-sq.light .cx-coord { color: #769656; }
+  .cx-sq.dark .cx-coord { color: #eeeed2; }
+
+  .cx-piece {
+    position: relative;
+    width: 82%;
+    height: 82%;
     pointer-events: none;
+    filter: drop-shadow(0 2px 2px rgba(0,0,0,0.35));
   }
-  .cx-piece.w {
-    color: #fcfcfe;
-    -webkit-text-stroke: 1.3px rgba(5,6,14,0.95);
-    filter: drop-shadow(0 0 1.5px rgba(5,6,14,0.9)) drop-shadow(0 0 1.5px rgba(5,6,14,0.9)) drop-shadow(0 2px 2px rgba(0,0,0,0.55));
-  }
-  .cx-piece.b {
-    color: #0c0e1c;
-    -webkit-text-stroke: 1.1px rgba(255,255,255,0.85);
-    filter: drop-shadow(0 0 1.5px rgba(255,255,255,0.9)) drop-shadow(0 0 1.5px rgba(255,255,255,0.9)) drop-shadow(0 1px 1px rgba(0,0,0,0.4));
-  }
+  .cx-piece-svg { width: 100%; height: 100%; display: block; }
+  .cx-piece-svg path, .cx-piece-svg circle, .cx-piece-svg rect { stroke: #1a1a1a; stroke-width: 1.5; stroke-linejoin: round; }
+  .cx-piece-svg.w path, .cx-piece-svg.w circle, .cx-piece-svg.w rect { fill: #fbfbf9; }
+  .cx-piece-svg.b path, .cx-piece-svg.b circle, .cx-piece-svg.b rect { fill: #3a3a3a; }
+  .cx-piece-svg .eye { fill: #1a1a1a; }
+  .cx-piece-svg.b .eye { fill: #eeeed2; }
 
   .cx-flying {
     position: absolute; top: 0; left: 0;
@@ -87,7 +89,6 @@
   }
   .cx-poof {
     position: absolute; top: 0; left: 0;
-    display: flex; align-items: center; justify-content: center;
     z-index: 25; pointer-events: none;
     animation: cx-poof-out 0.26s ease forwards;
   }
@@ -98,8 +99,8 @@
     z-index: 40;
     display: flex;
     gap: 4px;
-    background: var(--card);
-    border: 1px solid rgba(255,255,255,0.15);
+    background: #dcdcc8;
+    border: 1px solid rgba(0,0,0,0.25);
     border-radius: 10px;
     padding: 6px;
     box-shadow: var(--shadow);
@@ -108,14 +109,14 @@
   @keyframes cx-promo-in { from { opacity: 0; transform: translateY(-6px) scale(0.92); } to { opacity: 1; transform: translateY(0) scale(1); } }
   .cx-promo button {
     width: 42px; height: 42px;
-    font-size: 1.5rem;
+    padding: 5px;
     border-radius: 8px;
-    border: 1px solid rgba(255,255,255,0.1);
-    background: var(--bg-alt);
-    color: var(--text);
+    border: 1px solid rgba(0,0,0,0.15);
+    background: #eeeed2;
     cursor: pointer;
   }
-  .cx-promo button:hover { background: var(--card-hover); }
+  .cx-promo button:hover { background: #d5d5bd; }
+  .cx-promo button svg { width: 100%; height: 100%; display: block; }
 
   .cx-captured {
     display: flex;
@@ -123,10 +124,8 @@
     justify-content: center;
     gap: 2px;
     min-height: 24px;
-    font-size: 1.1rem;
-    color: var(--text-dim);
   }
-  .cx-captured .cx-piece { display: inline-block; font-size: 1.15rem; animation: cx-cap-in 0.25s ease; }
+  .cx-captured .cx-piece { width: 20px; height: 20px; filter: none; animation: cx-cap-in 0.25s ease; }
   @keyframes cx-cap-in { from { transform: scale(0.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 
   .cx-side-label { color: var(--text-dim); font-size: 0.78rem; font-weight: 700; margin: 6px 0 2px; }
@@ -472,7 +471,17 @@ function findBestMove(state) {
 
 /* ===================== UI layer ===================== */
 
-const PIECE_GLYPH = { K: '♚', Q: '♛', R: '♜', B: '♝', N: '♞', P: '♟' };
+const PIECE_PATHS = {
+  P: '<circle cx="22.5" cy="12" r="6.5"/><path d="M17,20 C17,24 15,26 14,30 C13,34 14,36.5 16,37.5 L29,37.5 C31,36.5 32,34 31,30 C30,26 28,24 28,20 Z"/><rect x="12" y="37.5" width="21" height="4" rx="1.5"/>',
+  R: '<rect x="9" y="36" width="27" height="4" rx="1"/><path d="M12,35 L14,29 L31,29 L33,35 Z"/><rect x="13" y="15" width="19" height="15"/><rect x="12" y="8" width="5" height="7"/><rect x="20" y="8" width="5" height="7"/><rect x="28" y="8" width="5" height="7"/><rect x="12" y="13" width="21" height="3"/>',
+  B: '<rect x="13" y="36" width="19" height="4" rx="1.5"/><path d="M15,35 L17,31 L28,31 L30,35 Z"/><path d="M22.5,11 C29,17 31,25 27.5,32.5 L17.5,32.5 C14,25 16,17 22.5,11 Z"/><rect x="17" y="21.2" width="11" height="1.6"/><circle cx="22.5" cy="7.5" r="3.3"/>',
+  N: '<rect x="10" y="36" width="25" height="4" rx="1.5"/><path d="M8,19 L9,15 L11,11 L14,8 L16,9 L18,3 L21,8 L25,7 L29,10 L33,15 L31,19 L34,22 L32,26 L34,29 L32,33 L31,35 L14,35 L13,30 L11,26 L12,22 L9,20 Z"/><circle class="eye" cx="15" cy="13" r="1.3"/>',
+  Q: '<rect x="11" y="36" width="23" height="4" rx="1.5"/><path d="M14,35 L16,28 L29,28 L31,35 Z"/><path d="M15,28 C14,23 15,18 17,14 L28,14 C30,18 31,23 30,28 Z"/><circle cx="13.5" cy="12" r="2.6"/><circle cx="18.7" cy="10" r="2.6"/><circle cx="22.5" cy="9" r="2.6"/><circle cx="26.3" cy="10" r="2.6"/><circle cx="31.5" cy="12" r="2.6"/>',
+  K: '<rect x="11" y="36" width="23" height="4" rx="1.5"/><path d="M14,35 L16,28 L29,28 L31,35 Z"/><path d="M15.5,28 C14.5,23 15.5,19 17.5,16 L27.5,16 C29.5,19 30.5,23 29.5,28 Z"/><circle cx="22.5" cy="15" r="4"/><rect x="20.7" y="4" width="3.6" height="9" rx="1"/><rect x="18" y="6.5" width="9" height="3.6" rx="1"/>',
+};
+function pieceSVGHTML(type, color) {
+  return `<svg viewBox="0 0 45 45" class="cx-piece-svg ${color}">${PIECE_PATHS[type]}</svg>`;
+}
 const boardEl = document.getElementById('board');
 const msgEl = document.getElementById('msg');
 const restartBtn = document.getElementById('restartBtn');
@@ -531,14 +540,24 @@ function render() {
       if (selected && selected.r === r && selected.c === c) sq.classList.add('selected');
       if (inCheckNow && kingSq.r === r && kingSq.c === c) sq.classList.add('in-check');
 
+      if (c === 0) {
+        const rankLabel = document.createElement('div');
+        rankLabel.className = 'cx-coord rank';
+        rankLabel.textContent = 8 - r;
+        sq.appendChild(rankLabel);
+      }
+      if (r === 7) {
+        const fileLabel = document.createElement('div');
+        fileLabel.className = 'cx-coord file';
+        fileLabel.textContent = 'abcdefgh'[c];
+        sq.appendChild(fileLabel);
+      }
+
       const piece = state.board[r][c];
       if (piece) {
-        const bg = document.createElement('div');
-        bg.className = 'cx-piece-bg ' + piece.color;
-        sq.appendChild(bg);
-        const p = document.createElement('span');
+        const p = document.createElement('div');
         p.className = 'cx-piece ' + piece.color;
-        p.textContent = PIECE_GLYPH[piece.type];
+        p.innerHTML = pieceSVGHTML(piece.type, piece.color);
         sq.appendChild(p);
       }
 
@@ -558,8 +577,8 @@ function render() {
 }
 
 function renderCaptured() {
-  capByWhiteEl.innerHTML = capturedByWhite.map(t => `<span class="cx-piece b">${PIECE_GLYPH[t]}</span>`).join('');
-  capByBlackEl.innerHTML = capturedByBlack.map(t => `<span class="cx-piece w">${PIECE_GLYPH[t]}</span>`).join('');
+  capByWhiteEl.innerHTML = capturedByWhite.map(t => `<span class="cx-piece b">${pieceSVGHTML(t, 'b')}</span>`).join('');
+  capByBlackEl.innerHTML = capturedByBlack.map(t => `<span class="cx-piece w">${pieceSVGHTML(t, 'w')}</span>`).join('');
 }
 
 function removePromoPicker() {
@@ -601,7 +620,7 @@ function showPromoPicker(sqElement, matches) {
     const m = matches.find(mm => mm.promotion === type);
     if (!m) return;
     const b = document.createElement('button');
-    b.textContent = PIECE_GLYPH[type];
+    b.innerHTML = pieceSVGHTML(type, state.turn);
     b.addEventListener('click', ev => { ev.stopPropagation(); commitMove(m); });
     picker.appendChild(b);
   });
@@ -696,20 +715,16 @@ function runAI() {
 
 function sleep(ms) { return new Promise(res => setTimeout(res, ms)); }
 
-function makeGhost(rect, boardRect, colorClass, glyph) {
+function makeGhost(rect, boardRect, type, color) {
   const g = document.createElement('div');
   g.className = 'cx-flying';
   g.style.width = rect.width + 'px';
   g.style.height = rect.height + 'px';
   g.style.left = (rect.left - boardRect.left) + 'px';
   g.style.top = (rect.top - boardRect.top) + 'px';
-  const bg = document.createElement('div');
-  bg.className = 'cx-piece-bg ' + colorClass;
-  g.appendChild(bg);
-  const p = document.createElement('span');
-  p.className = 'cx-piece ' + colorClass;
-  p.style.fontSize = (rect.height * 0.72) + 'px';
-  p.textContent = glyph;
+  const p = document.createElement('div');
+  p.className = 'cx-piece ' + color;
+  p.innerHTML = pieceSVGHTML(type, color);
   g.appendChild(p);
   boardEl.appendChild(g);
   return g;
@@ -735,8 +750,8 @@ async function animateMove(move) {
     const toEl = sqEl(part.to.r, part.to.c);
     const realPiece = fromEl.querySelector('.cx-piece');
     if (realPiece) realPiece.style.opacity = '0';
-    const glyph = move.promotion && part === parts[0] ? PIECE_GLYPH[move.promotion] : PIECE_GLYPH[part.piece.type];
-    const ghost = makeGhost(fromEl.getBoundingClientRect(), boardRect, part.piece.color, glyph);
+    const type = move.promotion && part === parts[0] ? move.promotion : part.piece.type;
+    const ghost = makeGhost(fromEl.getBoundingClientRect(), boardRect, type, part.piece.color);
     ghosts.push({ ghost, toEl });
   }
 
