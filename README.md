@@ -24,6 +24,7 @@ A small collection of browser games, playable with mouse/keyboard on PC or touch
 - Space Invaders
 - Dino Runner
 - Tetris
+- Chess (vs computer or 2-player)
 
 ## Running it
 
